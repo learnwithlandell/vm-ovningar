@@ -26,7 +26,7 @@ Du kommer också att konfigurera **statisk IP-adress** på båda servrarna och t
 
 📸 Exempel:
 
-![Skapa virtuell switch](./94a41a04-6b21-4bb7-8e13-7d6336198c84.png)
+![Skapa virtuell switch](./img/hyperv-ny-switch.png)
 
 ---
 
