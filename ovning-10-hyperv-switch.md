@@ -39,7 +39,7 @@ Du kommer också att konfigurera **statisk IP-adress** på båda servrarna och t
 
 📸 Exempel:
 
-![Koppla VM till switch](./f1cfb61a-2c3c-4af7-8004-f1d6dac93b61.png)
+![Koppla VM till switch](./img/hyperv-byt-nw.png)
 
 ---
 
