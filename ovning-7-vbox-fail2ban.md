@@ -28,45 +28,45 @@ SSH är redan installerat och aktiverat.
 
 **På Debian 13 (10.0.2.7):**
 
-'''
+```
 su root
 sudo apt update
 sudo apt install fail2ban -y
-'''
+```
 
 Bekräfta att tjänsten körs:
-'''
+```
 sudo systemctl status fail2ban
-'''
+```
 
 Du ska se något i stil med:
-'''
+```
 Active: active (running)
-'''
+```
 
 ---
 
 ## 📁 Del 2: Skapa en egen konfiguration
 
 Gör en kopia av standardfilen:
-'''
+```
 sudo cp /etc/fail2ban/jail.conf /etc/fail2ban/jail.local
-'''
+```
 
 Öppna din lokala konfiguration:
-'''
+```
 sudo nano /etc/fail2ban/jail.local
-'''
+```
 
 Leta upp sektionen `[DEFAULT]` och redigera så här:
-'''
+```
 #banaction = iptables-multiport
 banaction = nftables-multiport
-'''
+```
 
 Leta upp sektionen `[sshd]` och redigera så här:
 
-'''
+```
 [sshd]
 enabled = true
 port = ssh
@@ -77,7 +77,7 @@ findtime = 300
 bantime = 120
 ignoreip = 127.0.0.1/8
 backend = %(sshd_backend)s
-'''
+```
 
 **Förklaring:**
 
@@ -93,13 +93,13 @@ Spara och stäng (`Ctrl+O`, `Enter`, `Ctrl+X`).
 
 ## 🔄 Del 3: Starta om och verifiera
 
-'''
+```
 sudo systemctl restart fail2ban
 sudo fail2ban-client status sshd
-'''
+```
 
 Exempel på utdata:
-'''
+```
 Status for the jail: sshd
 |- Filter
 |  |- Currently failed: 0
@@ -109,7 +109,7 @@ Status for the jail: sshd
 |- Currently banned: 0
 |- Total banned: 0
 `- Banned IP list:
-'''
+```
 
 ---
 
@@ -117,9 +117,9 @@ Status for the jail: sshd
 
 Från klienten, försök logga in med fel lösenord 3 gånger:
 
-'''
+```
 ssh student@10.0.2.7
-'''
+```
 
 Skriv fel lösenord tre gånger i rad.
 
@@ -130,27 +130,27 @@ Skriv fel lösenord tre gånger i rad.
 På Debian 13 (server):
 
 Visa loggen:
-'''
+```
 sudo tail -n 20 /var/log/fail2ban.log
-'''
+```
 
 Exempel på utdata:
-'''
+```
 INFO    [sshd] Found 10.0.2.8 - 2025-10-12 20:18:45
 INFO    [sshd] Found 10.0.2.8 - 2025-10-12 20:18:50
 INFO    [sshd] Found 10.0.2.8 - 2025-10-12 20:18:55
 INFO    [sshd] Ban 10.0.2.8
-'''
+```
 
 Visa status:
-'''
+```
 sudo fail2ban-client status sshd
-'''
+```
 
 Utdata ska visa:
-'''
+```
 Banned IP list: 10.0.2.8
-'''
+```
 
 ---
 
@@ -158,23 +158,23 @@ Banned IP list: 10.0.2.8
 
 Från klienten (10.0.2.8), försök igen:
 
-'''
+```
 ssh student@10.0.2.7
-'''
+```
 
 Du bör få:
-'''
+```
 ssh: connect to host 10.0.2.7 port 22: Connection refused
-'''
+```
 
 ---
 
 ## ⏱️ Del 7: Vänta 2 minuter och testa igen
 
 Efter 2 minuter:
-'''
+```
 ssh student@10.0.2.7
-'''
+```
 
 Nu ska du kunna logga in normalt igen.
 
@@ -183,15 +183,15 @@ Nu ska du kunna logga in normalt igen.
 ## 📜 Del 8: Visa loggar som bevis
 
 På servern:
-'''
+```
 sudo grep "Ban|Unban" /var/log/fail2ban.log
-'''
+```
 
 Exempelutdata:
-'''
+```
 INFO    [sshd] Ban 10.0.2.8
 INFO    [sshd] Unban 10.0.2.8
-'''
+```
 
 Det visar att IP:et först bannats, sedan släppts efter 2 minuter.
 
@@ -201,9 +201,9 @@ Det visar att IP:et först bannats, sedan släppts efter 2 minuter.
 
 Vill du se allt live:
 
-'''
+```
 sudo tail -f /var/log/fail2ban.log
-'''
+```
 
 Låt fönstret vara öppet medan du gör nya inloggningsförsök från klienten.
 
@@ -216,4 +216,4 @@ När du är klar ska du kunna visa:
 1. Din `/etc/fail2ban/jail.local` innehåller rätt inställningar
 2. Utdrag ur `fail2ban.log` som visar `Ban` och `Unban`
 3. Att du blir utelåst efter 3 försök, och kan logga in igen efter 2 minuter
-   '''
+   ```
