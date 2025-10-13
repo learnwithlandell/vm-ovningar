@@ -35,6 +35,7 @@ Efter övningen ska du kunna:
 
 4. Kontrollera att MariaDB är installerad på **10.0.2.7** och att SSH-servern är igång på alla maskiner:
    ```
+   # redan igång - behövs ej om ni använder mina maskiner
    sudo apt install openssh-server -y
    systemctl enable --now ssh
    ```
@@ -54,7 +55,8 @@ Efter övningen ska du kunna:
 
 2. Skapa en testdatabas med lite data:
    ```
-   mysql -u root -p
+   su root
+   mysql -u root
    CREATE DATABASE test_db;
    USE test_db;
    CREATE TABLE data (id INT PRIMARY KEY, value VARCHAR(50));
@@ -65,7 +67,7 @@ Efter övningen ska du kunna:
 
 3. Skapa en användare med bara rättigheter för backup:
    ```
-   mysql -u root -p
+   mysql -u root
    CREATE USER 'backup_user'@'localhost' IDENTIFIED BY 'SakertLosen123!';
    GRANT SELECT, LOCK TABLES ON *.* TO 'backup_user'@'localhost';
    FLUSH PRIVILEGES;
@@ -74,8 +76,7 @@ Efter övningen ska du kunna:
 
 4. Testa att ta en manuell backup:
    ```
-   mysqldump -u backup_user -p test_db > /tmp/test_db_backup.sql
-   echo "Backup lyckades!"
+   mysqldump -u backup_user -p test_db > /tmp/test_db_backup.sql && echo "Backup lyckades!"
    ```
 
 ---
@@ -85,7 +86,7 @@ Efter övningen ska du kunna:
 1. Skapa katalogen där backupfilerna ska sparas:
    ```
    sudo mkdir -p /var/backups/mariadb
-   sudo chown $USER:$USER /var/backups/mariadb
+   sudo chown backup:backup /var/backups/mariadb
    ```
 
 2. Skapa skriptet:
@@ -148,8 +149,9 @@ Efter övningen ska du kunna:
 
 1. På **10.0.2.8**, skapa en mapp för inkommande backupfiler:
    ```
+   sudo adduser elev
    sudo mkdir -p /mnt/backups/10.0.2.7
-   sudo chown $USER:$USER /mnt/backups/10.0.2.7
+   sudo chown elev:elev /mnt/backups/10.0.2.7
    ```
 
 2. På **10.0.2.7**, öppna ditt backup-skript igen:
@@ -172,6 +174,10 @@ Efter övningen ska du kunna:
 
 ## 🔹 Steg 5: Testa återställning (10.0.2.15)
 
+Förberedelser
+```
+sudo apt install mariadb-server -y
+```
 1. Hämta backupfilen från **10.0.2.7** eller **10.0.2.8**:
    ```
    mkdir -p ~/test_restore && cd ~/test_restore
@@ -180,19 +186,20 @@ Efter övningen ska du kunna:
 
 2. Skapa en ny testdatabas:
    ```
-   mysql -u root -p
+   su root
+   mysql -u root
    CREATE DATABASE restore_test_db;
    \q
    ```
 
 3. Återställ backupen:
    ```
-   gunzip < test_db_YYYYMMDD_HHMMSS.sql.gz | mysql -u root -p restore_test_db
+   gunzip < test_db_YYYYMMDD_HHMMSS.sql.gz | mysql -u root restore_test_db
    ```
 
 4. Kontrollera innehållet:
    ```
-   mysql -u root -p
+   mysql -u root
    USE restore_test_db;
    SELECT * FROM data;
    \q
