@@ -36,9 +36,8 @@ Vi kommer även använda din host-dator (Windows/Mac/Linux) i den här övningen
 Logga in på **system3 (10.0.2.15)** och öppna terminalen:
 
 ```
-sudo -i
+su -
 apt update && apt upgrade -y
-apt install ssh -y
 apt install openvpn easy-rsa -y
 ```
 
