@@ -103,9 +103,11 @@ sudo cp pki/dh.pem /etc/openvpn/
 Kopiera även klientfiler till hemkatalogen:
 
 ```
-sudo cp pki/issued/client1.crt ~/
-sudo cp pki/private/client1.key ~/
-sudo cp pki/ca.crt ~/
+sudo cp pki/issued/client1.crt /home/vboxuser/
+sudo cp pki/private/client1.key /home/vboxuser/
+sudo cp pki/ca.crt /home/vboxuser/
+sudo chown vboxuser:vboxuser /home/vboxuser/*
+
 ```
 
 ---
