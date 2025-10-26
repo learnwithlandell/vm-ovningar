@@ -203,9 +203,9 @@ resolv-retry infinite
 nobind
 persist-key
 persist-tun
-ca C:\vpn\ca.crt
-cert C:\vpn\client1.crt
-key C:\vpn\client1.key
+ca C:\\vpn\\ca.crt
+cert C:\\vpn\\client1.crt
+key C:\\vpn\\client1.key
 remote-cert-tls server
 cipher AES-256-GCM
 auth SHA256
