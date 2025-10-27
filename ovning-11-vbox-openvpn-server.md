@@ -1,7 +1,7 @@
-# 🔒 Övning: Installera och testa en OpenVPN-server på Debian
+# 🔒 Övning: Installera och testa en OpenVPN-server på Debian 13
 
 I denna övning lär du dig att installera, konfigurera och testa en **OpenVPN-server** på Debian.
-Du kommer att skapa certifikat, konfigurera brandväggen och sedan ansluta från din dator (Windows/Mac) till VPN-servern i VirtualBox – för att nå andra system i samma interna nätverk.
+Du kommer att skapa certifikat, sätta upp nätverket med `netplan`, och sedan ansluta från din dator (Windows/Mac) till VPN-servern i VirtualBox – för att nå andra system i samma interna nätverk.
 
 ---
 
@@ -10,7 +10,7 @@ Du kommer att skapa certifikat, konfigurera brandväggen och sedan ansluta från
 Efter övningen ska du kunna:
 
 * Installera och konfigurera en OpenVPN-server på Debian
-* Förstå hur VirtualBox-nätverken NAT Network och Internal Network fungerar
+* Förstå hur VirtualBox-näten **NAT Network** och **Internal Network** samverkar
 * Skapa certifikat och nycklar med Easy-RSA
 * Ansluta från din host till VPN-servern
 * Nå interna system via VPN-tunneln
@@ -19,26 +19,36 @@ Efter övningen ska du kunna:
 
 ## 🧰 Förutsättningar
 
-Du har importerat tre Debian-maskiner i VirtualBox, du hittar dem [här](https://github.com/learnwithlandell/vm-ovningar/blob/main/ovning-5-vbox-import-appliances.md). 
-Vi kommer även använda din host-dator (Windows/Mac/Linux) i den här övningen. 
+Du har importerat tre Debian-maskiner i VirtualBox, du hittar dem
+[här](https://github.com/learnwithlandell/vm-ovningar/blob/main/ovning-5-vbox-import-appliances.md).
+Vi använder även din host-dator (Windows/Mac/Linux) i denna övning.
 
-| System         | Roll                     | IP-adress | Nätverksinställning (initialt)            | Kommentar                            |
-| -------------- | ------------------------ | --------- | ----------------------------------------- | ------------------------------------ |
-| **system1**    | Intern server/klient     | 10.0.2.7  | **Adapter 1: NAT Network (MinPlattform)** | Internetåtkomst för apt-installation |
-| **system2**    | Intern server/klient     | 10.0.2.8  | **Adapter 1: NAT Network (MinPlattform)** | Internetåtkomst för apt-installation |
-| **system3**    | **VPN-server (OpenVPN)** | 10.0.2.15 | **Adapter 1: NAT Network (MinPlattform)** | Internetåtkomst för apt-installation |
-| **Host-dator** | VPN-klient (Windows/Mac) | –         | Internet + OpenVPN GUI                    | Ansluter till system3 via VPN tunnel |
+**Nätverksupplägg (efter Steg 10 i guiden nedan):**
+
+| System         | Adapter 1                     | Adapter 2                    | IP-adress(er)                                | Kommentar           |
+| -------------- | ----------------------------- | ---------------------------- | -------------------------------------------- | ------------------- |
+| **system1**    | **Disabled**                  | **Internal Network: vpnlab** | 10.0.3.10                                    | Endast internt      |
+| **system2**    | **Disabled**                  | **Internal Network: vpnlab** | 10.0.3.20                                    | Endast internt      |
+| **system3**    | **NAT Network: MinPlattform** | **Internal Network: vpnlab** | 10.0.2.15 (NAT), 10.0.3.1 (vpnlab)           | VPN-server & router |
+| **Host-dator** | –                             | –                            | 127.0.0.1:1194 → (port forward till system3) | OpenVPN-klient      |
+
+> Varför så?
+>
+> * **system3** behöver NAT för att hosten ska kunna nå port **1194/UDP** via **Port Forwarding**.
+> * **system1 & system2** är rena interna noder (ingen internetåtkomst), därför **Adapter 1 = Disabled** på dem.
+> * Alla tre har **Adapter 2 = Internal Network: vpnlab** för det interna 10.0.3.0/24-nätet.
 
 ---
 
 ## 🪜 Steg 1 – Installera nödvändiga paket på system3
 
-Logga in på **system3 (10.0.2.15)** och öppna terminalen:
+Logga in på **system3 (10.0.2.15)** och kör:
 
 ```
 su -
 apt update && apt upgrade -y
 apt install openvpn easy-rsa -y
+systemctl disable ufw --now
 ```
 
 ---
@@ -53,7 +63,7 @@ cp vars.example vars
 nano vars
 ```
 
-Redigera fält (ta bort # om de finns):
+Redigera fälten (ta bort # om de finns):
 
 ```
 set_var EASYRSA_DN "org"
@@ -94,20 +104,20 @@ openvpn --genkey tls-auth ta.key
 ## 📂 Steg 5 – Kopiera filer till OpenVPN-mappen
 
 ```
-sudo cp pki/ca.crt /etc/openvpn/
-sudo cp pki/issued/server.crt /etc/openvpn/
-sudo cp pki/private/server.key /etc/openvpn/
-sudo cp pki/dh.pem /etc/openvpn/
+cp pki/ca.crt /etc/openvpn/
+cp pki/issued/server.crt /etc/openvpn/
+cp pki/private/server.key /etc/openvpn/
+cp pki/dh.pem /etc/openvpn/
+cp ta.key /etc/openvpn/
 ```
 
-Kopiera även klientfiler till hemkatalogen:
+Kopiera även klientfiler till `/home/vboxuser/`:
 
 ```
-sudo cp pki/issued/client1.crt /home/vboxuser/
-sudo cp pki/private/client1.key /home/vboxuser/
-sudo cp pki/ca.crt /home/vboxuser/
-sudo chown vboxuser:vboxuser /home/vboxuser/*
-
+cp pki/issued/client1.crt /home/vboxuser/
+cp pki/private/client1.key /home/vboxuser/
+cp pki/ca.crt /home/vboxuser/
+chown vboxuser:vboxuser /home/vboxuser/*
 ```
 
 ---
@@ -115,7 +125,10 @@ sudo chown vboxuser:vboxuser /home/vboxuser/*
 ## ⚙️ Steg 6 – Skapa och redigera serverkonfiguration
 
 ```
-sudo cp /usr/share/doc/openvpn/examples/sample-config-files/server.conf /etc/openvpn/
+# skippa nästa rad om du vill klistra in hela kodblocket
+cp /usr/share/doc/openvpn/examples/sample-config-files/server.conf /etc/openvpn/
+
+# öppna eller skapa openvpn server konfigurationsfil
 nano /etc/openvpn/server.conf
 ```
 
@@ -129,8 +142,11 @@ ca /etc/openvpn/ca.crt
 cert /etc/openvpn/server.crt
 key /etc/openvpn/server.key
 dh /etc/openvpn/dh.pem
+
 server 192.168.3.0 255.255.255.0
-ifconfig-pool-persist /var/log/openvpn/ipp.txt
+topology subnet
+push "route 10.0.3.0 255.255.255.0"
+
 keepalive 10 120
 cipher AES-256-GCM
 persist-key
@@ -144,61 +160,171 @@ explicit-exit-notify 1
 
 ---
 
-## 🔓 Steg 7 – Öppna brandväggen (UFW)
+## 🌐 Steg 7 – Netplan-konfigurationer
+
+### 🛡 system3 (NAT + internt)
 
 ```
-sudo apt install ufw -y
-sudo ufw allow 22/tcp
-sudo ufw allow 1194/udp
-sudo ufw enable
-sudo ufw status verbose
+nano /etc/netplan/01-netcfg.yaml
+```
+
+```
+network:
+  version: 2
+  renderer: NetworkManager
+  ethernets:
+    enp0s8:
+      dhcp4: no
+      addresses:
+        - 10.0.3.1/24
+    enp0s3:
+      dhcp4: no
+      addresses:
+        - 10.0.2.15/24
+      routes:
+        - to: default
+          via: 10.0.2.1
+      nameservers:
+        addresses:
+          - 8.8.8.8
+```
+
+```
+netplan apply
+```
+
+### 🖥 system1 (endast internt)
+
+```
+nano /etc/netplan/01-netcfg.yaml
+```
+
+```
+network:
+  version: 2
+  renderer: NetworkManager
+  ethernets:
+    enp0s8:
+      dhcp4: no
+      addresses:
+        - 10.0.3.10/24
+      routes:
+        - to: default
+          via: 10.0.3.1
+      nameservers:
+        addresses:
+          - 8.8.8.8
+```
+
+```
+netplan apply
+ping 10.0.3.1
+```
+
+### 🖥 system2 (endast internt)
+
+```
+nano /etc/netplan/01-netcfg.yaml
+```
+
+```
+network:
+  version: 2
+  renderer: NetworkManager
+  ethernets:
+    enp0s8:
+      dhcp4: no
+      addresses:
+        - 10.0.3.20/24
+      routes:
+        - to: default
+          via: 10.0.3.1
+      nameservers:
+        addresses:
+          - 8.8.8.8
+```
+
+```
+netplan apply
+ping 10.0.3.1
 ```
 
 ---
 
-## 🚀 Steg 8 – Starta och aktivera OpenVPN-servern
+## 🧩 Steg 8 – IP-forwarding och rp_filter (Debian 13-sättet)
+
+Skapa fil på **system3**:
 
 ```
-sudo systemctl start openvpn@server
-sudo systemctl enable openvpn@server
-sudo systemctl status openvpn@server
+nano /etc/sysctl.d/99-forwarding.conf
+```
+Innehåll:
+
+```
+net.ipv4.ip_forward=1
+net.ipv4.conf.all.rp_filter=0
+net.ipv4.conf.default.rp_filter=0
+net.ipv4.conf.tun0.rp_filter=0
+net.ipv4.conf.enp0s8.rp_filter=0
+```
+Ladda om:
+
+```
+sysctl --system
 ```
 
 ---
 
-## 🔄 **Steg 9 – Byt nätverksläge till Internal Network**
+## 🚀 Steg 9 – Starta och aktivera OpenVPN-servern
 
-När installationen och uppdateringar är klara:
-
-1. Stäng av **system1**, **system2** och **system3**.
-2. I VirtualBox, gå till **Settings → Network → Adapter 1**
-3. Ändra från **NAT Network (MinPlattform)** till **Internal Network**
-4. Ange **Name:** `vpnlab`
-5. Starta om alla tre maskiner.
-
-### ✅ Resultat:
-
-* Maskinerna ligger nu i samma isolerade nätverk.
-* IP-adresserna (10.0.2.7, .8, .15) finns kvar tack vare netplan.
-* Ingen internetåtkomst – all trafik stannar i labbnätet.
+```
+systemctl start openvpn@server
+systemctl enable openvpn@server
+systemctl status openvpn@server
+```
 
 ---
 
-## 💻 Steg 10 – Skapa klientkonfiguration (på host-dator)
+## 🔄 Steg 10 – Ställ in VirtualBox-nät (adapterordning)
+
+Gör så här i **VirtualBox**:
+
+* **system1**
+
+  * **Adapter 1:** Disabled
+  * **Adapter 2:** Internal Network → **Name:** `vpnlab`
+
+* **system2**
+
+  * **Adapter 1:** Disabled
+  * **Adapter 2:** Internal Network → **Name:** `vpnlab`
+
+* **system3**
+
+  * **Adapter 1:** **NAT Network** → **Name:** `MinPlattform`
+
+    * **Advanced → Port Forwarding**:
+
+      | Name    | Protocol | Host IP   | Host Port | Guest IP  | Guest Port |
+      | ------- | -------- | --------- | --------- | --------- | ---------- |
+      | openvpn | UDP      | 127.0.0.1 | 1194      | 10.0.2.15 | 1194       |
+  * **Adapter 2:** Internal Network → **Name:** `vpnlab`
+
+Starta alla tre maskiner.
+
+---
+
+## 💻 Steg 11 – Skapa klientkonfiguration (host-dator)
 
 1. Skapa `C:\vpn` (Windows) eller `~/vpn` (Mac).
-2. Kopiera över från **system3**:
-
-   * `ca.crt`
-   * `client1.crt`
-   * `client1.key`
+2. Kopiera från **system3**: `ca.crt`, `client1.crt`, `client1.key`
 3. Skapa `client.ovpn`:
 
 ```
 client
 dev tun
 proto udp
-remote 10.0.2.15 1194
+remote 127.0.0.1 1194
 resolv-retry infinite
 nobind
 persist-key
@@ -214,59 +340,58 @@ verb 3
 
 ---
 
-## 🧩 Steg 11 – Installera OpenVPN GUI (host-dator)
+## 🧩 Steg 12 – Installera OpenVPN GUI (host-dator)
 
-1. Ladda ner OpenVPN GUI: [https://openvpn.net/community-downloads/](https://openvpn.net/community-downloads/)
-2. Installera och starta som administratör.
+1. Ladda ner [OpenVPN GUI](https://openvpn.net/community-downloads/)
+2. Installera och starta som administratör
 3. Högerklicka på ikonen → **Import file** → välj `client.ovpn`
 4. Högerklicka igen → **Connect**
 
-✅ “Connected to server” betyder att tunneln fungerar.
+✅ “Connected to server” betyder att tunneln är uppe.
 
 ---
 
-## 🌍 Steg 12 – Testa åtkomst till interna system
+## 🌍 Steg 13 – Testa åtkomst till interna system
 
-På **system3** (VPN-server):
+Säkerställ att servern redan har raden i **/etc/openvpn/server.conf** (du lade in den i Steg 6):
 
 ```
-sudo nano /etc/openvpn/server.conf
+push "route 10.0.3.0 255.255.255.0"
 ```
+Starta om OpenVPN på **system3** om du ändrat något:
 
-Lägg till:
 ```
-push "route 10.0.2.0 255.255.255.0"
-```
-
-Starta om:
-```
-sudo systemctl restart openvpn@server
+systemctl restart openvpn@server
 ```
 
-På **host-datorn** (ansluten via VPN):
+Testa från **hosten** (när VPN är anslutet):
+
 ```
-ping 10.0.2.7
-ping 10.0.2.8
+ping 10.0.3.1
+ping 10.0.3.10
+ping 10.0.3.20
 ```
 
-Om du får svar → VPN-routing OK 🎉
+Om du får svar från alla → VPN & routing OK 🎉
 
 ---
 
-## 🧠 Felsökning
+## 🧠 Felsökning (kort)
 
-* **TLS Error:** kontrollera certifikat och portar.
-* **Ingen ping:** verifiera att alla VMs ligger i `vpnlab`.
-* **UFW blockerar:** `sudo ufw status verbose`.
+* `sysctl net.ipv4.ip_forward` ska vara `= 1` på system3.
+* `ip route show` på system3 ska visa:
+  `10.0.3.0/24 dev enp0s8` och `192.168.3.0/24 dev tun0`.
+* `route print` (Windows) ska innehålla route till `10.0.3.0/24` via `192.168.3.1`.
+* Testa med `tcpdump` på system3:
+  `tcpdump -ni tun0 icmp` och `tcpdump -ni enp0s8 icmp` medan du pingar 10.0.3.10 från hosten.
 
 ---
 
 ## ✅ Resultat
 
-* Du kan ansluta till VPN-servern på 10.0.2.15
-* Du når system1 och system2 via VPN-tunneln
-* Alla IP-adresser och netplan-konfigurationer återanvänds
-* Du förstår hur man går från NAT Network → Internal Network på ett säkert sätt
+* **system1 & system2** har **Adapter 1 avstängd**, kör endast **Internal Network (vpnlab)** på Adapter 2.
+* **system3** har **NAT Network (MinPlattform)** på Adapter 1 + **Internal Network (vpnlab)** på Adapter 2.
+* Host ansluter via **127.0.0.1:1194** (port forward) och når **10.0.3.10** och **10.0.3.20** via VPN-tunneln.
 
 ---
 
