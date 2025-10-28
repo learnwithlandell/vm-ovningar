@@ -71,7 +71,7 @@ set_var EASYRSA_REQ_COUNTRY "SE"
 set_var EASYRSA_REQ_PROVINCE "ST"
 set_var EASYRSA_REQ_CITY "Stockholm"
 set_var EASYRSA_REQ_ORG "Minskola"
-set_var EASYRSA_REQ_EMAIL "[hej@minskola.se](mailto:hej@minskola.se)"
+set_var EASYRSA_REQ_EMAIL "hej@minskola.se"
 set_var EASYRSA_REQ_OU "Kontoret"
 ```
 
@@ -126,7 +126,7 @@ chown vboxuser:vboxuser /home/vboxuser/*
 
 ```
 # skippa nästa rad om du vill klistra in hela kodblocket
-cp /usr/share/doc/openvpn/examples/sample-config-files/server.conf /etc/openvpn/
+# cp /usr/share/doc/openvpn/examples/sample-config-files/server.conf /etc/openvpn/
 
 # öppna eller skapa openvpn server konfigurationsfil
 nano /etc/openvpn/server.conf
@@ -160,7 +160,59 @@ explicit-exit-notify 1
 
 ---
 
-## 🌐 Steg 7 – Netplan-konfigurationer
+## 💻 Steg 7 – Skapa klientkonfiguration (host-dator)
+
+1. Skapa `C:\vpn` (Windows) eller `~/vpn` (Mac).
+2. Kopiera från **system3**: `ca.crt`, `client1.crt`, `client1.key`
+```
+mkdir c:\vpn
+scp -P 2325 vboxuser@localhost:/home/vboxuser/*.* c:\vpn
+```
+3. Skapa `client.ovpn`:
+
+```
+client
+dev tun
+proto udp
+remote 127.0.0.1 1194
+resolv-retry infinite
+nobind
+persist-key
+persist-tun
+ca C:\\vpn\\ca.crt
+cert C:\\vpn\\client1.crt
+key C:\\vpn\\client1.key
+remote-cert-tls server
+cipher AES-256-GCM
+auth SHA256
+verb 3
+```
+
+---
+
+## 🧩 Steg 8 – Installera OpenVPN GUI (host-dator)
+
+1. Ladda ner [OpenVPN GUI](https://openvpn.net/community-downloads/)
+2. Installera och starta som administratör
+3. Högerklicka på ikonen → **Import file** → välj `client.ovpn`
+4. Högerklicka igen → **Connect**
+
+✅ “Connected to server” betyder att tunneln är uppe.
+
+---
+
+## 🚀 Steg 9 – Starta och aktivera OpenVPN-servern
+
+```
+# på system3
+systemctl start openvpn@server
+systemctl enable openvpn@server
+systemctl status openvpn@server
+```
+
+---
+
+## 🌐 Steg 10 – Netplan-konfigurationer
 
 ### 🛡 system3 (NAT + internt)
 
@@ -251,7 +303,7 @@ ping 10.0.3.1
 
 ---
 
-## 🧩 Steg 8 – IP-forwarding och rp_filter (Debian 13-sättet)
+## 🧩 Steg 11 – IP-forwarding och rp_filter (Debian 13-sättet)
 
 Skapa fil på **system3**:
 
@@ -275,17 +327,7 @@ sysctl --system
 
 ---
 
-## 🚀 Steg 9 – Starta och aktivera OpenVPN-servern
-
-```
-systemctl start openvpn@server
-systemctl enable openvpn@server
-systemctl status openvpn@server
-```
-
----
-
-## 🔄 Steg 10 – Ställ in VirtualBox-nät (adapterordning)
+## 🔄 Steg 12 – Ställ in VirtualBox-nät (adapterordning)
 
 Gör så här i **VirtualBox**:
 
@@ -311,43 +353,6 @@ Gör så här i **VirtualBox**:
   * **Adapter 2:** Internal Network → **Name:** `vpnlab`
 
 Starta alla tre maskiner.
-
----
-
-## 💻 Steg 11 – Skapa klientkonfiguration (host-dator)
-
-1. Skapa `C:\vpn` (Windows) eller `~/vpn` (Mac).
-2. Kopiera från **system3**: `ca.crt`, `client1.crt`, `client1.key`
-3. Skapa `client.ovpn`:
-
-```
-client
-dev tun
-proto udp
-remote 127.0.0.1 1194
-resolv-retry infinite
-nobind
-persist-key
-persist-tun
-ca C:\\vpn\\ca.crt
-cert C:\\vpn\\client1.crt
-key C:\\vpn\\client1.key
-remote-cert-tls server
-cipher AES-256-GCM
-auth SHA256
-verb 3
-```
-
----
-
-## 🧩 Steg 12 – Installera OpenVPN GUI (host-dator)
-
-1. Ladda ner [OpenVPN GUI](https://openvpn.net/community-downloads/)
-2. Installera och starta som administratör
-3. Högerklicka på ikonen → **Import file** → välj `client.ovpn`
-4. Högerklicka igen → **Connect**
-
-✅ “Connected to server” betyder att tunneln är uppe.
 
 ---
 
