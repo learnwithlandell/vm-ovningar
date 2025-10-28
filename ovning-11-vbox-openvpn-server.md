@@ -192,7 +192,7 @@ verb 3
 
 ## 🧩 Steg 8 – Installera OpenVPN GUI (host-dator)
 
-1. Ladda ner [OpenVPN GUI](https://openvpn.net/community-downloads/)
+1. Ladda ner [OpenVPN Client](https://openvpn.net/client/)
 2. Installera och starta som administratör
 3. Högerklicka på ikonen → **Import file** → välj `client.ovpn`
 4. Högerklicka igen → **Connect**
